@@ -6,12 +6,15 @@ use App\Filament\Resources\SectionResource\Pages;
 use App\Filament\Resources\SectionResource\RelationManagers;
 use App\Models\Section;
 use Filament\Forms;
+use Filament\Forms\Components\Card;
 use Filament\Resources\Form;
 use Filament\Resources\Resource;
 use Filament\Resources\Table;
 use Filament\Tables;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Storage;
 
 class SectionResource extends Resource
 {
@@ -23,14 +26,21 @@ class SectionResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('title')
+                Card::make()->schema([
+                    Forms\Components\TextInput::make('title')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('thumbnail')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Textarea::make('content')
+                Forms\Components\FileUpload::make('thumbnail')
+                    ->required()->image()->disk('public'),
+                Forms\Components\RichEditor::make('content')
                     ->required(),
+                Forms\Components\Select::make('post_as')->options([
+                    'JUMBOTRON' => 'JUMBOTRON',
+                    'ABOUT' => 'ABOUT',
+
+                ])
+
+                ]),
             ]);
     }
 
@@ -38,12 +48,10 @@ class SectionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('title'),
-                Tables\Columns\TextColumn::make('thumbnail'),
-                Tables\Columns\TextColumn::make('content'),
+                Tables\Columns\TextColumn::make('title')->sortable()->searchable(),
+                Tables\Columns\ImageColumn::make('thumbnail'),
+                Tables\Columns\TextColumn::make('post_as')->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime(),
-                Tables\Columns\TextColumn::make('updated_at')
                     ->dateTime(),
             ])
             ->filters([
@@ -53,7 +61,15 @@ class SectionResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+                Tables\Actions\DeleteBulkAction::make()->after(function (Collection
+                $records) {
+                    foreach ($records as $key => $value) {
+                        if ($value->thumbnail){
+                            Storage::disk('public')->delete($value->thumbnail);
+                        }
+                    }
+                }
+                )
             ]);
     }
 
